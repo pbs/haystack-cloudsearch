@@ -28,56 +28,59 @@ Installation
 
 #. Install it by running one of the following commands:
 
-   From inside the repo's root directory:
+   From inside the repo's root directory::
 
-   `` python setup.py install ``
+        python setup.py install
 
-   Or, directly from GitHub, 
+   Or, directly from GitHub::
 
-   `` pip install -e git+https://github.com/pbs/haystack-cloudsearch.git#haystack_cloudsearch ``
+        pip install -e git+https://github.com/pbs/haystack-cloudsearch.git#egg=haystack_cloudsearch
 
-#. Add the following to your project's settings.py:
+#. Add the following to your project's settings.py::
 
-   HAYSTACK_CONNECTIONS = {
-       'default': {
-          'ENGINE': 'haystack.backends.cloudsearch_backend.CloudsearchSearchEngine',
-          'AWS_ACCESS_KEY_ID': 'YOUR ACCESS KEY HERE',
-          'AWS_SECRET_KEY': 'YOUR SECRET KEY HERE',
-          'IP_ADDRESS': 'The IP Address you will be accessing cloudsearch from',
-       }
-   }
+    HAYSTACK_CONNECTIONS = {
+        'default': {
+            'ENGINE': 'haystack.backends.cloudsearch_backend.CloudsearchSearchEngine',
+            'AWS_ACCESS_KEY_ID': 'YOUR ACCESS KEY HERE',
+            'AWS_SECRET_KEY': 'YOUR SECRET KEY HERE',
+            'IP_ADDRESS': 'The IP Address you will be accessing cloudsearch from',
+        }
+    }
 
-#. Add `haystack` to your project's INSTALLED_APPS.
+#. Add *haystack* to your project's **INSTALLED_APPS**.
 
 Usage
 ------
 Since blended search isn't very useful with respect to Cloudsearch (you can't rank across SearchDomains), I didn't
-implement SearchQuerySet. Instead, I implemented the following:
+implement SearchQuerySet. Instead, I implemented the following::
 
-    `def search(index_instance, query_string, **query_options)`
+    def search(index_instance, query_string, **query_options)
 
-    `def get_backend_for_index(index_instance)`
+    def get_backend_for_index(index_instance)`
 
-    `def get_queryset_from_results(index_instance, results)`
+    def get_queryset_from_results(index_instance, results)
 
-`search` provides a thin wrapper around the backend's search providing you with the same information a SearchQuerySet would
+*search* provides a thin wrapper around the backend's search providing you with the same information a SearchQuerySet would
 receieve, namely a dictionary with keys for hits (integer total number of results), results (list of SearchResult objects),
 and facets (dictionary of facet names mapped to lists of value, number tuples).
 
-`search` passes `**query_options` onto 
+*search* passes `**query_options` onto boto's search, effectively allowing you the api in *boto.cloudsearch.search*. (Document
+this here and submit it to boto for their docs as well)
 
-`get_backend_for_index` allows you easy access to the default backend, which has a number of features:
+*get_backend_for_index* allows you easy access to the default backend, which has a number of features including:
 
-    `backend.get_search_domain_name` takes an index instance and yields a unicode string representing the SearchDomain
-    `backend.boto_conn` is the live boto cloudsearch layer 2 object. You can use it to get a reference to the SearchDomain like this:
-
-        ``backend.boto_conn.get_domain(backend.get_search_domain_name(my_index_instance))``
-
-`get_queryset_from_results` wraps the results of a search the 'results' key in the dictionary returned by search() and gives you
+* *backend.get_search_domain_name* -- takes an index instance and yields a unicode string representing the SearchDomain
+* *backend.boto_conn* -- is the live boto cloudsearch layer 2 object. You can use it to get a reference to the SearchDomain like this::
+        
+        backend = get_backend_for_index(my_index_instance)
+        backend.boto_conn.get_domain(backend.get_search_domain_name(my_index_instance))
+ 
+*get_queryset_from_results* wraps the results of a search the 'results' key in the dictionary returned by search() and gives you
 a Django QuerySet over those results for the appropriate model.
 
 Todo
 -----
+* Document all the options on search(), then provide that documentation to boto.cloudsearch.search as well
 * Handle processing events more sanely in the underlying boto wrapper and continue sanity here.
 * Query the environment for AWS_ACCESS_KEY_ID and AWS_SECRET_KEY before raising ImproperlyConfigured.
 * AutoQuery support to Cloudsearch's flavor of Boolean Search.
