@@ -14,7 +14,7 @@ from haystack.utils import get_identifier
 
 from django.contrib.contenttypes.models import ContentType
 
-from haystack_cloudsearch.utils import (ID, DJANGO_CT, DJANGO_ID,
+from haystack_cloudsearch.cloudsearch_utils import (ID, DJANGO_CT, DJANGO_ID,
                                         gen_version,
                                         botobool)
 try:
