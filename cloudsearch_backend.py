@@ -22,6 +22,7 @@ try:
 except ImportError:
     raise MissingDependency("The 'cloudsearch' backend requires the installation of 'boto'. Please refer to the documentation.")
 
+from boto.cloudsearch import CloudsearchProcessingException, CloudsearchNeedsIndexingException
 
 class CloudsearchSearchBackend(BaseSearchBackend):
 
@@ -291,6 +292,27 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         """ Blended search across all SearchIndexes.
 
             limit_indexes - list of indexes to limit the search to (default: search all registered indexes)
+
+            query_string should typically be in the format of:
+
+                ($OPERATOR (label $SOMEFIELD:"param") (label $SOMEFIELD:"param"))
+
+            where $OPERATOR is either 'and', 'or', or 'not' and $SOMEFIELD is a field name in the SearchDomain
+            The param passed can be prefix matching by including an * (asterisk) after your prefix.
+            Unsigned integers can be specified with multiple numbers comma-separated and with ranges such that
+            ..NUMBER is -infinity to NUMBER
+            NUMBER0..NUMBER1 is from NUMBER0 to NUMBER1
+            NUMBER.. is from NUMBER to +infinity
+
+            See cloudsearch documentation for more information.
+
+            facet - is a list of facet field names.
+            facet-top-n is a dict of facet field names to an integer specifying how many facets to return
+                e.g. facet-top-n={'my-faceted-field': 5} (default is 10)
+            facet-constraints is a dict of facet field names to constraints as described by the cloudsearch docs. e.g.
+                facet-constraints={'my-faceted-field': ['blue'], 'my-other-facteted-field': '1999..2010'} (default: no constraints)
+
+            :raises: boto.cloudsearch.CloudsearchProcessingException, boto.cloudsearch.CloudsearchNeedsIndexingException
         """
 
         # by convention, empty query strings return no results
@@ -338,14 +360,20 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         return [u'django_id', u'id', u'djang_ct']
 
     def search_index(self, index, query_string, **kwargs):
-        """ given an index and a boolean query, return raw boto results """
+        """ given an index and a boolean query, return raw boto results
+
+        :raises: boto.cloudsearch.CloudsearchProcessingException, boto.cloudsearch.CloudsearchNeedsIndexingException
+        """
         try:
             return_fields = [kwargs.pop('return_fields')]
             return_fields.extend(self.internal_field_names())
             return_fields = list(set(return_fields))
         except KeyError:
             return_fields = self.field_names_for_index(index)
-        search_service = self.boto_conn.get_domain(self.get_searchdomain_name(index)).get_search_service()
+        try:
+            search_service = self.boto_conn.get_domain(self.get_searchdomain_name(index)).get_search_service(loose=False, needs_integrity=True)
+        except (CloudsearchProcessingException, CloudsearchNeedsIndexingException), e:
+            raise  # We should probably wrap this into something more common to haystack
         query = search_service.search(bq=query_string, return_fields=return_fields, **kwargs)
         return query
 
