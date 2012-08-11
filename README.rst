@@ -12,12 +12,19 @@ a system that doesn't provide rank scores or the methodology used for ranking, a
 Because of this, haystack-cloudsearch provides a simple api for doing filtered and faceted search, based on what boto provides, but
 with convenience functions to map directly to Django QuerySets.
 
+Pull requests are welcome. In particular, the tests are still getting up to speed, and it's an open question of how much of
+SearchQuerySet is worth implementing to gain features written around Haystack. 
+
+This heavily depends on the excellend boto library. The boto plugin for cloudsearch is still very new and would also appreciate
+pull requests.
+
 * more information on Django Haystack (version 2.x) can be found here: `haystacksearch.org <http://haystacksearch.org/>`_.
 * more information on Amazon Cloudsearch can be found here: `aws.amazon.com/cloudsearch <http://aws.amazon.com/cloudsearch/>`_.
+* more information on Boto can be found here: `github.com/boto/boto <https://github.com/boto/boto/>`_.
 
 Requirements
 -------------
-* Python 2.6+
+* Python 2.7 (TODO: test 2.6, PyPy)
 * Django 1.4+ (TODO: test Django 1.3.x support?)
 * Django-Haystack 2.x
 * Boto from `https://github.com/emidln/boto.git@cloudsearch` (TODO: update when mainline boto has these patches)
