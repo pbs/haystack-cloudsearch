@@ -58,6 +58,9 @@ Installation
 
 Usage
 ------
+Cloudsearch-specific fields can be found in haystack_cloudsearch.fields. LiteralField, FacetedLiteralField, and UnsignedIntegerField,
+are available for use alongside CharField and FacetedCharField.
+
 Since blended search isn't very useful with respect to Cloudsearch (you can't rank across SearchDomains), I didn't
 implement SearchQuerySet. Instead, I implemented the following::
 
