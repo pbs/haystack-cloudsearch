@@ -12,7 +12,6 @@ from haystack.exceptions import MissingDependency
 from haystack.models import SearchResult
 from haystack.utils import get_identifier
 
-from django.contrib.contenttypes.models import ContentType
 
 from haystack_cloudsearch.cloudsearch_utils import (ID, DJANGO_CT, DJANGO_ID,
                                         gen_version,
@@ -62,8 +61,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
     def get_searchdomain_name(self, index):
         """ given a SearchIndex, calculate the name for the CloudSearch SearchDomain """
         model = index.get_model()
-        ct = ContentType.objects.get_for_model(model)
-        return "%s-%s-%s" % tuple(map(lambda x: x.lower(), (self.search_domain_prefix, ct.app_label, unicode(index.__class__.__name__).strip('_'))))
+        return "%s-%s-%s" % tuple(map(lambda x: x.lower(), (self.search_domain_prefix, model._meta.app_label, unicode(index.__class__.__name__).strip('_'))))
 
     def get_field_type(self, field):
         """ maps field type classes to cloudsearch field types; raises KeyError if field is unmappable """
