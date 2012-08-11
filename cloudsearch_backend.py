@@ -253,7 +253,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         """ cause reindexing of a particular index """
         return self.boto_conn.layer1.index_documents(self.get_searchdomain_name(index))
 
-    def clear(self, models=None, commit=True, block=True, domains=None, indexes=None):
+    def clear(self, models=None, commit=True, domains=None, indexes=None):
         """ clear SearchDomains by model, index, or everything """
         # the implementation here just deletes the domain, recreates it, then reloads the schema
         # commit is basically ignored
@@ -273,20 +273,8 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         for d in domains:
             self.boto_conn.layer1.delete_domain(d)
 
-        if block:
-            while not self.setup_complete:
-                try:
-                    self.setup()
-                except KeyError:
-                    if any(map(lambda x: getattr(x, 'processing', False),
-                            map(self.boto_conn.get_domain, domains))):
-                        time.sleep(30)
-                    else:
-                        raise
-        else:
-            # rebuild schema
-            self.setup()
-
+        # rebuild schema
+        self.setup()
 
     def search(self, query_string, **kwargs):
         """ Blended search across all SearchIndexes.
