@@ -41,7 +41,7 @@ Installation
 
    Or, directly from GitHub::
 
-        pip install -e git+https://github.com/pbs/haystack-cloudsearch.git#egg=haystack_cloudsearch
+        pip install -e git+https://github.com/pbs/haystack-cloudsearch.git@develop#egg=haystack_cloudsearch
 
 #. Add the following to your project's settings.py::
 
