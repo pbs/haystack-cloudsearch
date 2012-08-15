@@ -155,7 +155,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 options[u'result_enabled'] = botobool(field.stored)
                 options[u'search_enabled'] = botobool(field.indexed)
                 d[u'literal_options'] = options
-            if field.stored == field.faceted:
+            if field.stored and field.faceted:
                 raise Exception("Fields must either be faceted or stored, not both.") # TODO: make this exception named
             results.append(d)
 
