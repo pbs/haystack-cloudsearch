@@ -186,7 +186,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             This can have adverse results if you have more than one SearchIndex mapped
             to the same model...
 
-            This bakes in the same braindead assumption that the rest of haystack makes
+            This bakes in an assumption that seemingly the rest of haystack makes
             about one ORM Model per Haystack SearchIndex. This will need to change
             when the assumption is lifted.
         """

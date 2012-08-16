@@ -51,6 +51,7 @@ Installation
             'AWS_ACCESS_KEY_ID': 'YOUR ACCESS KEY HERE',
             'AWS_SECRET_KEY': 'YOUR SECRET KEY HERE',
             'IP_ADDRESS': 'The IP Address you will be accessing cloudsearch from',
+            #'SEARCH_DOMAIN_PREFIX': 'optional string to namespace your search domain with; defaults to haystack'
         }
     }
 
