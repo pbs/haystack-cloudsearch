@@ -1,8 +1,8 @@
+
 import logging
 import time
 
-
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db.models.loading import get_model
 from django.utils import simplejson
 
@@ -14,14 +14,23 @@ from haystack.utils import get_identifier
 
 
 from haystack_cloudsearch.cloudsearch_utils import (ID, DJANGO_CT, DJANGO_ID,
-                                        gen_version,
-                                        botobool)
+                                                    gen_version,
+                                                    botobool)
 try:
     import boto
 except ImportError:
     raise MissingDependency("The 'cloudsearch' backend requires the installation of 'boto'. Please refer to the documentation.")
 
-from boto.cloudsearch import CloudsearchProcessingException, CloudsearchNeedsIndexingException
+try:
+    from boto.cloudsearch import CloudsearchProcessingException, CloudsearchNeedsIndexingException
+except ImportError:
+    raise MissingDependency("The 'cloudsearch' backend requires an installation of 'boto' from the cloudsearch branch at https://github.com/pbs/boto")
+
+
+class CloudsearchDryerExploded(Exception):
+    """ This is raised when the max timeout for a spinlock is encountered. """
+    pass
+
 
 class CloudsearchSearchBackend(BaseSearchBackend):
 
@@ -37,9 +46,13 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         # Allow overrides for the SearchDomain prefix
         self.search_domain_prefix = connection_options.get('SEARCH_DOMAIN_PREFIX', 'haystack')
 
-        self.ip_address = connection_options.get('IP_ADDRESS')
-        if self.ip_address is None:
-            raise ImproperlyConfigured("You must specify IP_ADDRESS in your settings for connection '%s'." % connection_alias)
+        # Setup the maximum amount of time to spin while waiting
+        self.max_spin_cycle = connection_options.get('MAX_SPINLOCK_TIME', 60 * 60)
+
+        # this isn't supported yet
+        #self.ip_address = connection_options.get('IP_ADDRESS')
+        #if self.ip_address is None:
+        #    raise ImproperlyConfigured("You must specify IP_ADDRESS in your settings for connection '%s'." % connection_alias)
 
         self.boto_conn = boto.connect_cloudsearch(connection_options['AWS_ACCESS_KEY_ID'], connection_options['AWS_SECRET_KEY'])
         # this will become a standard haystack logger down the line
@@ -55,7 +68,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         """
         domain = self.boto_conn.get_domain(search_domain)
         if domain is None:
-            raise Exception('Unable to enable SearchDomain %s because %s was not found.' %  (search_domain, search_domain))
+            raise Exception('Unable to enable SearchDomain %s because %s was not found.' % (search_domain, search_domain))
         policy = domain.get_access_policies()
         r0 = policy.allow_search_ip(ip_address)
         r1 = policy.allow_doc_ip(ip_address)
@@ -74,8 +87,17 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 'UnsignedIntegerField': u'uint',
                 'LiteralField': u'literal',
                 'FacetLiteralField': u'literal',
+                'MultiValueCharField': u'text',
+                'FacetMultiValueCharField': u'text',
+                'MultiValueLiteralField': u'literal',
+                'FacetMultiValueLiteralField': u'literal',
+                'MultiValueUnsignedIntegerField': u'uint',
             }
         return d[field.__class__.__name__]
+
+    def validate_search_domain_name(self, search_domain_name):
+        """ Validates a SearchDomain name generated from an index against Amazon Cloudsearch constraints. """
+        return True
 
     def setup(self):
         """ create a cloudsearch schema based on haystack SearchIndexes
@@ -86,6 +108,12 @@ class CloudsearchSearchBackend(BaseSearchBackend):
 
         for index in unified_index.collect_indexes():
             search_domain_name = self.get_searchdomain_name(index)
+            try:
+                self.validate_search_domain_name(search_domain_name)
+            except ValidationError, e:
+                self.log.critical("Generated SearchDomain name, '%s', for index, '%s', failed validation constraints." % (
+                    search_domain_name, index))
+                raise
             domain = self.boto_conn.get_domain(search_domain_name)
             should_build_schema = False
             if domain is None:
@@ -132,6 +160,10 @@ class CloudsearchSearchBackend(BaseSearchBackend):
 
         self.setup_complete = True  # should be True when finished
 
+    def validate_index_field_name(self, name):
+        """ validation checks for index field name requirements imposed by Amazon Cloudsearch """
+        return True
+
     def build_schema(self, fields):
         """ return a dictionary describing the schema """
 
@@ -143,8 +175,13 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 field_type = self.get_field_type(field)
             except KeyError:
                 # This needs to be a real exception
-                raise Exception('CloudsearchSearchBackend only supports CharField, UnsignedIntegerField, and LiteralField.')
+                raise Exception('CloudsearchSearchBackend only supports CharField, UnsignedIntegerField, and LiteralField plus Facet- and MultiValue- variations of these.')
             d[u'index_field_name'] = unicode(field.index_fieldname)
+            try:
+                self.validate_index_field_name(d[u'index_field_name'])
+            except ValidationError, e:
+                self.log.critical("Attempted to build schema with an invalid field index name: '%s'." % (d[u'index_field_name'],))
+                raise
             d[u'index_field_type'] = field_type
             options = {u'default_value': default_value}
             if field_type == u'uint':
@@ -254,10 +291,9 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         """ cause reindexing of a particular index """
         return self.boto_conn.layer1.index_documents(self.get_searchdomain_name(index))
 
-    def clear(self, models=None, commit=True, domains=None, indexes=None, everything=False):
+    def clear(self, models=None, commit=True, domains=None, indexes=None, everything=False, spinlock=True):
         """ clear SearchDomains by model, index, or everything """
         # the implementation here just deletes the domain, recreates it, then reloads the schema
-        # commit is basically ignored
         domains = domains or []
         if models is not None:
             m = self.get_model_to_index_map()
@@ -279,8 +315,32 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         for d in domains:
             self.boto_conn.layer1.delete_domain(d)
 
-        # rebuild schema
-        self.setup()
+        if spinlock:
+            if self.domain_processing_spinlock():
+                if commit:
+                    self.setup()
+            else:
+                raise CloudsearchDryerExploded('While waiting for a delete domain to finish, we hit our max timeout. Please investigate your SearchDomains.')
+        else:
+            if commit:
+                self.setup()
+
+    def spinlock(self, test, exception, description):
+        """ execute test, spinning on exception, returning True if the test passes """
+        self.log.debug('entering %s spinlock' % (description,))
+        t0 = int(time.time())
+        while (int(time.time()) - t0) < self.max_spin_cycle:
+            try:
+                if test():
+                    self.log.debug('leaving %s spinlock' % (description,))
+                    return True
+            except exception:
+                self.log.debug('sleeping during %s spinlock' % (description,))
+                time.sleep(60)
+        return False
+
+    def domain_processing_spinlock(self):
+        return self.spinlock(lambda: filter(None, map(self.boto_conn.get_domain, domains)), CloudsearchProcessingException, 'domain processing')
 
     def search(self, query_string, **kwargs):
         """ Blended search across all SearchIndexes.

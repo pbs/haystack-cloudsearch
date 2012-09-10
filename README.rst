@@ -47,7 +47,7 @@ Installation
 
     HAYSTACK_CONNECTIONS = {
         'default': {
-            'ENGINE': 'haystack.backends.cloudsearch_backend.CloudsearchSearchEngine',
+            'ENGINE': 'haystack_cloudsearch.cloudsearch_backend.CloudsearchSearchEngine',
             'AWS_ACCESS_KEY_ID': 'YOUR ACCESS KEY HERE',
             'AWS_SECRET_KEY': 'YOUR SECRET KEY HERE',
             'IP_ADDRESS': 'The IP Address you will be accessing cloudsearch from',
