@@ -251,7 +251,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         """ cause reindexing of a particular index """
         return self.boto_conn.layer1.index_documents(self.get_searchdomain_name(index))
 
-    def clear(self, models=None, commit=True, domains=None, indexes=None):
+    def clear(self, models=None, commit=True, domains=None, indexes=None, everything=False):
         """ clear SearchDomains by model, index, or everything """
         # the implementation here just deletes the domain, recreates it, then reloads the schema
         # commit is basically ignored
@@ -267,6 +267,11 @@ class CloudsearchSearchBackend(BaseSearchBackend):
 
         if models is None and indexes is None and domains is None:
             domains = [x['domain_name'] for x in self.boto_conn.layer1.describe_domains()]
+            if not everything:
+                conn = haystack.connections[self.connection_alias]
+                unified_index = conn.get_unified_index()
+                index_set = set([self.get_searchdomain_name(i) for i in unified_index.collect_indexes()])
+                domains = list(set(domains) & index_set)
 
         for d in domains:
             self.boto_conn.layer1.delete_domain(d)
