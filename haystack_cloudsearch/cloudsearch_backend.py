@@ -53,7 +53,10 @@ class CloudsearchSearchBackend(BaseSearchBackend):
     def enable_domain_access(self, search_domain, ip_address):
         """ takes the cloudsearch search_domain name  and an ip_address to enable searching and doc services for
         """
-        policy = self.boto_conn.get_domain(search_domain).get_access_policies()
+        domain = self.boto_conn.get_domain(search_domain)
+        if domain is None:
+            raise Exception('Unable to enable SearchDomain %s because %s was not found.' %  (search_domain, search_domain))
+        policy = domain.get_access_policies()
         r0 = policy.allow_search_ip(ip_address)
         r1 = policy.allow_doc_ip(ip_address)
         return r0, r1
