@@ -24,7 +24,7 @@ haystack.fields.CharField (and haystack.fields.FacetCharField), you get the foll
 Pull requests are welcome. In particular, the tests are still getting up to speed, and it's an open question of how much of
 SearchQuerySet is worth implementing to gain features written around Haystack. 
 
-This heavily depends on the excellend boto library. The boto plugin for cloudsearch is still very new and would also appreciate
+This heavily depends on the excellent boto library. The boto plugin for cloudsearch is still very new and would also appreciate
 pull requests.
 
 * more information on Django Haystack (version 2.x) can be found here: `haystacksearch.org <http://haystacksearch.org/>`_.
@@ -69,7 +69,7 @@ Installation
 Usage
 ------
 Cloudsearch-specific fields can be found in haystack_cloudsearch.fields. LiteralField, FacetedLiteralField, and UnsignedIntegerField,
-are available for use alongside CharField and FacetedCharField.
+are available for use alongside CharField and FacetedCharField. MultiValue and FacetMultiValue versions are also available.
 
 Since blended search isn't very useful with respect to Cloudsearch (you can't rank across SearchDomains), I didn't
 implement SearchQuerySet. Instead, I implemented the following::
@@ -97,6 +97,40 @@ this here and submit it to boto for their docs as well)
  
 *get_queryset* wraps the results of a search the 'results' key in the dictionary returned by search() and gives you
 a Django QuerySet over those results for the appropriate model.
+
+The way to bootstrap the system by hand is like this (in the shell)::
+
+  >>> from myapp.search_indexes import MyIndex
+  >>> from haystack_cloudsearch.cloudsearch_utils import get_backend
+  >>> i = MyIndex()
+  >>> b = get_backend(i)
+  >>> b.setup()
+  >>> b.enable_index_access(i, b.ip_address)
+  >>> b.boto_conn.layer1.index_documents(b.get_searchdomain_name(i))
+  >>> def get_domain():
+  ...     return b.boto_conn.get_domain(b.get_searchdomain_name(i))
+  ...
+  >>> import time
+  >>> t0 = int(time.time())
+  >>> while True:
+  ...     if not get_domain().processing:
+  ...         print int(time.time()) - t0
+  ...         break
+  ...     time.sleep(30)
+  ...
+  >>> b.update(i, i.index_queryset().all())
+
+The update can fail, and there really should be a generalized processing wait utility as well as a utility to
+get a domain given an index. This should further be wrapped up to replace the appropriate management commands.
+
+Spinlocks (or, Amazon plz can haz webhookz/queue_service?)
+---------------------------------------------------
+Cloudsearch requires processing for most administrative changes. These typically take at least 15 minutes to complete. Because of this,
+you may encounter spinlocks (logged at the DEBUG level). This ensures that certain actions aren't taken "out of order". For example,
+deleting a search domain followed by creating one of the same name (a clear()), will normally result in an "undelete" operation. This
+typically isn't intended, and leads to non-obvious schema conflicts. As such, some operations now take a spinlock=True argument, particularly
+in the backend. Those that currently don't, should be modified to.
+
 
 Todo
 -----
