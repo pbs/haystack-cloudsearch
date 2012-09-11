@@ -12,6 +12,15 @@ a system that doesn't provide rank scores or the methodology used for ranking, a
 Because of this, haystack-cloudsearch provides a simple api for doing filtered and faceted search, based on what boto provides, but
 with convenience functions to map directly to Django QuerySets.
 
+haystack-cloudsearch comes with a variety of custom field types to meet Cloudsearch requirements. In addition to the typical
+haystack.fields.CharField (and haystack.fields.FacetCharField), you get the following in the haystack_cloudsearch.fields namespace:
+
+* UnsignedIntegerField (faceting is implied due to the way cloudsearch works)
+* LiteralField (and FacetLiteralField)
+* MultiValueCharField (and FacetMultiValueCharField) (this is basically the same as haystack.fields.MultiValueField)
+* MultiValueLiteralField (and FacetMultiValueLiteralField)
+* MultiValueUnsignedIntegerField (faceted is implied due to the way cloudsearch works)
+
 Pull requests are welcome. In particular, the tests are still getting up to speed, and it's an open question of how much of
 SearchQuerySet is worth implementing to gain features written around Haystack. 
 
