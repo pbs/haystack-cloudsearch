@@ -304,7 +304,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             for i in indexes:
                 domains.append(self.get_searchdomain_name(i))
 
-        if models is None and indexes is None and domains is None:
+        if models is None and indexes is None and not domains:
             domains = [x['domain_name'] for x in self.boto_conn.layer1.describe_domains()]
             if not everything:
                 conn = haystack.connections[self.connection_alias]
@@ -312,11 +312,12 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 index_set = set([self.get_searchdomain_name(i) for i in unified_index.collect_indexes()])
                 domains = list(set(domains) & index_set)
 
+        self.log.debug('deleting domains: %s' % (', '.join(domains),))
         for d in domains:
             self.boto_conn.layer1.delete_domain(d)
 
         if spinlock:
-            if self.domain_processing_spinlock():
+            if self.domain_processing_spinlock(domains):
                 if commit:
                     self.setup()
             else:
@@ -334,13 +335,15 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 if test():
                     self.log.debug('leaving %s spinlock' % (description,))
                     return True
+                self.log.debug('no exception, sleeping during %s spinlock' % (description,))
+                time.sleep(60)
             except exception:
-                self.log.debug('sleeping during %s spinlock' % (description,))
+                self.log.debug('exception sleeping during %s spinlock' % (description,))
                 time.sleep(60)
         return False
 
-    def domain_processing_spinlock(self):
-        return self.spinlock(lambda: filter(None, map(self.boto_conn.get_domain, domains)), CloudsearchProcessingException, 'domain processing')
+    def domain_processing_spinlock(self, domains):
+        return self.spinlock(lambda: not filter(None, map(self.boto_conn.get_domain, domains)), CloudsearchProcessingException, 'domain processing')
 
     def search(self, query_string, **kwargs):
         """ Blended search across all SearchIndexes.
