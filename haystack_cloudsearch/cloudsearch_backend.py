@@ -280,7 +280,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             obj_id = u"%s__%s__%s" % (app_label, model_name, pk)
             index = get_model(app_label, model_name)
         else:
-            obj_id = u"%s__%s__%s" % (obj_or_string._meta.app_label, obj_or_string._meta.module_name, obj_or_string._get_pk_value())
+            obj_id = u"%s__%s__%s" % (obj_or_string._meta.app_label, obj_or_string._meta.module_name, obj_or_string._get_pk_val())
             index = self.get_index_for_obj(obj_or_string)
 
         doc_service = self.boto_conn.get_domain(self.get_searchdomain_name(index)).get_document_service()
