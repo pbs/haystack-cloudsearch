@@ -49,10 +49,9 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         # Setup the maximum amount of time to spin while waiting
         self.max_spin_cycle = connection_options.get('MAX_SPINLOCK_TIME', 60 * 60)
 
-        # this isn't supported yet
-        #self.ip_address = connection_options.get('IP_ADDRESS')
-        #if self.ip_address is None:
-        #    raise ImproperlyConfigured("You must specify IP_ADDRESS in your settings for connection '%s'." % connection_alias)
+        self.ip_address = connection_options.get('IP_ADDRESS')
+        if self.ip_address is None:
+            raise ImproperlyConfigured("You must specify IP_ADDRESS in your settings for connection '%s'." % connection_alias)
 
         self.boto_conn = boto.connect_cloudsearch(connection_options['AWS_ACCESS_KEY_ID'], connection_options['AWS_SECRET_KEY'])
         # this will become a standard haystack logger down the line
