@@ -36,13 +36,17 @@ Requirements
 * Python 2.7 (TODO: test 2.6, PyPy)
 * Django 1.4+ (TODO: test Django 1.3.x support?)
 * Django-Haystack 2.x
-* Boto from `https://github.com/emidln/boto.git@cloudsearch` (TODO: update when mainline boto has these patches)
+* Boto from `https://github.com/pbs/boto/tree/cloudsearch` (TODO: update when mainline boto has these patches)
 * Amazon AWS account credentials
 
 Installation
 -------------
 
 #. Install it by running one of the following commands:
+
+   First, install the modified boto::
+
+        pip install -e git+https://github.com/pbs/boto.git@cloudsearch#egg=boto
 
    From inside the repo's root directory::
 
