@@ -49,6 +49,8 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         # Setup the maximum amount of time to spin while waiting
         self.max_spin_cycle = connection_options.get('MAX_SPINLOCK_TIME', 60 * 60)
 
+        self.silently_fail = connection_options.get('UPLOAD_SILENTLY_FAIL', False)
+
         self.ip_address = connection_options.get('IP_ADDRESS')
         if self.ip_address is None:
             raise ImproperlyConfigured("You must specify IP_ADDRESS in your settings for connection '%s'." % connection_alias)
@@ -109,7 +111,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             search_domain_name = self.get_searchdomain_name(index)
             try:
                 self.validate_search_domain_name(search_domain_name)
-            except ValidationError, e:
+            except ValidationError:
                 self.log.critical("Generated SearchDomain name, '%s', for index, '%s', failed validation constraints." % (
                     search_domain_name, index))
                 raise
@@ -178,7 +180,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             d[u'index_field_name'] = unicode(field.index_fieldname)
             try:
                 self.validate_index_field_name(d[u'index_field_name'])
-            except ValidationError, e:
+            except ValidationError:
                 self.log.critical("Attempted to build schema with an invalid field index name: '%s'." % (d[u'index_field_name'],))
                 raise
             d[u'index_field_type'] = field_type
@@ -195,7 +197,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 options[u'search_enabled'] = botobool(field.indexed)
                 d[u'literal_options'] = options
             if field.stored and field.faceted:
-                raise Exception("Fields must either be faceted or stored, not both.") # TODO: make this exception named
+                raise Exception("Fields must either be faceted or stored, not both.")  # TODO: make this exception named
             results.append(d)
 
         # haystack expects these to be able to map a result onto a model
@@ -234,18 +236,19 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         return dict((index.get_model().__class__.__name__, index)
                 for index in unified_index.collect_indexes())
 
-    def update(self, index, iterable):
+    def update(self, index, iterable, errors_allowed=False):
+        iterable = list(iterable)
         if not self.setup_complete:
             try:
                 self.setup()
             # we need to map which exceptions are possible here and handle them appropriately
             except Exception, e:
-                if not self.silently_fail:
-                    raise
                 self.log.error(u'Failed to add documents to Cloudsearch')
                 name = getattr(e, '__name__', e.__class__.__name__)
                 self.log.error(u'%s while setting up index' % name, exc_info=True,
                         extra={'data': {'index': index}})
+                if not self.silently_fail:
+                    raise
                 return
 
         doc_service = self.boto_conn.get_domain(self.get_searchdomain_name(index)).get_document_service()
@@ -254,13 +257,18 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         for obj in iterable:
             try:
                 prepped_objs.append(index.full_prepare(obj))
+
             # we need to map which exceptions are possible here and handle them appropriately
             except Exception, e:
+                name = getattr(e, '__name__', e.__class__.__name__)
+                self.log.error(u'%s while preparing object for update' % name, exc_info=True, extra={'data': {'index': index, 'object': get_identifier(obj)}})
                 if not self.silently_fail:
                     raise
 
-                name = getattr(e, '__name__', e.__class__.__name__)
-                self.log.error(u'%s while preparing object for update' % name, exc_info=True, extra={'data': {'index': index, 'object': get_identifier(obj)}})
+        # extra sanity checking on demand
+        if not errors_allowed:
+            if len(prepped_objs) != len(iterable):
+                raise ValidationError('Number of objects successully prepared differs from number presented for update')
 
         # this needs some help in terms of generating an id
         for obj in prepped_objs:
@@ -428,7 +436,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             return_fields = self.field_names_for_index(index)
         try:
             search_service = self.boto_conn.get_domain(self.get_searchdomain_name(index)).get_search_service(loose=False, needs_integrity=True)
-        except (CloudsearchProcessingException, CloudsearchNeedsIndexingException), e:
+        except (CloudsearchProcessingException, CloudsearchNeedsIndexingException):
             raise  # We should probably wrap this into something more common to haystack
         query = search_service.search(bq=query_string, return_fields=return_fields, **kwargs)
         return query
