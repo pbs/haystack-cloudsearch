@@ -65,6 +65,9 @@ Installation
             'AWS_SECRET_KEY': 'YOUR SECRET KEY HERE',
             'IP_ADDRESS': 'The IP Address you will be accessing cloudsearch from',
             #'SEARCH_DOMAIN_PREFIX': 'optional string to namespace your search domain with; defaults to haystack'
+            #'MAX_SPINLOCK_TIME': 60*60,  # number of seconds before processing spinlocks give up
+            #'UPLOAD_SILENTLY_FAIL': False, # If False, raise ValidationError if preparation of uploads fails.
+                                            # If True, continue with upload
         }
     }
 
@@ -126,6 +129,10 @@ The way to bootstrap the system by hand is like this (in the shell)::
 
 The update can fail, and there really should be a generalized processing wait utility as well as a utility to
 get a domain given an index. This should further be wrapped up to replace the appropriate management commands.
+
+Logging
+--------
+The backend logs everything to the 'haystack-cloudsearch' handler.
 
 Spinlocks (or, Amazon plz can haz webhookz/queue_service?)
 ---------------------------------------------------
