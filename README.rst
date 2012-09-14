@@ -66,8 +66,8 @@ Installation
             'IP_ADDRESS': 'The IP Address you will be accessing cloudsearch from',
             #'SEARCH_DOMAIN_PREFIX': 'optional string to namespace your search domain with; defaults to haystack'
             #'MAX_SPINLOCK_TIME': 60*60,  # number of seconds before processing spinlocks give up
-            #'UPLOAD_SILENTLY_FAIL': False, # If False, raise ValidationError if preparation of uploads fails.
-                                            # If True, continue with upload
+            #'PREPARE_SILENTLY': False, # If False, raise ValidationError if preparation of uploads fails.
+                                        # If True, continue with upload
         }
     }
 

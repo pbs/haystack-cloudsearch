@@ -49,7 +49,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         # Setup the maximum amount of time to spin while waiting
         self.max_spin_cycle = connection_options.get('MAX_SPINLOCK_TIME', 60 * 60)
 
-        self.silently_fail = connection_options.get('UPLOAD_SILENTLY_FAIL', False)
+        self.prepare_silently = connection_options.get('PREPARE_SILENTLY', False)
 
         self.ip_address = connection_options.get('IP_ADDRESS')
         if self.ip_address is None:
@@ -247,7 +247,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 name = getattr(e, '__name__', e.__class__.__name__)
                 self.log.error(u'%s while setting up index' % name, exc_info=True,
                         extra={'data': {'index': index}})
-                if not self.silently_fail:
+                if not self.prepare_silently:
                     raise
                 return
 
@@ -262,7 +262,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             except Exception, e:
                 name = getattr(e, '__name__', e.__class__.__name__)
                 self.log.error(u'%s while preparing object for update' % name, exc_info=True, extra={'data': {'index': index, 'object': get_identifier(obj)}})
-                if not self.silently_fail:
+                if not self.prepare_silently:
                     raise
 
         # extra sanity checking on demand
