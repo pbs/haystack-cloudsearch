@@ -60,6 +60,10 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         self.log = logging.getLogger('haystack-cloudsearch')
         self.setup_complete = False
 
+    def get_domain(self, index):
+        """ Given a SearchIndex, return a boto Domain object """
+        return self.boto_conn.get_domain(self.get_searchdomain_name(index))
+
     def enable_index_access(self, index, ip_address):
         """ given an index and an ip_address to enable, enable searching and document services """
         return self.enable_domain_access(self.get_searchdomain_name(index), ip_address)
@@ -75,10 +79,14 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         r1 = policy.allow_doc_ip(ip_address)
         return r0, r1
 
-    def get_searchdomain_name(self, index):
+    def get_searchdomain_name(self, index, cache={}):
         """ given a SearchIndex, calculate the name for the CloudSearch SearchDomain """
-        model = index.get_model()
-        return "%s-%s-%s" % tuple(map(lambda x: x.lower(), (self.search_domain_prefix, model._meta.app_label, unicode(index.__class__.__name__).strip('_'))))
+        try:
+            return cache[index]
+        except KeyError:
+            model = index.get_model()
+            cache[index] = "%s-%s-%s" % tuple(map(lambda x: x.lower(), (self.search_domain_prefix, model._meta.app_label, unicode(index.__class__.__name__).strip('_'))))
+            return cache[index]
 
     def get_field_type(self, field):
         """ maps field type classes to cloudsearch field types; raises KeyError if field is unmappable """
@@ -251,7 +259,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                     raise
                 return
 
-        doc_service = self.boto_conn.get_domain(self.get_searchdomain_name(index)).get_document_service()
+        doc_service = self.get_domain(index).get_document_service()
 
         prepped_objs = []
         for obj in iterable:
@@ -290,7 +298,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             obj_id = u"%s__%s__%s" % (obj_or_string._meta.app_label, obj_or_string._meta.module_name, obj_or_string._get_pk_val())
             index = self.get_index_for_obj(obj_or_string)
 
-        doc_service = self.boto_conn.get_domain(self.get_searchdomain_name(index)).get_document_service()
+        doc_service = self.get_domain(index).get_document_service()
         doc_service.delete(obj_id, gen_version())
         doc_service.commit()
 
@@ -435,7 +443,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         except KeyError:
             return_fields = self.field_names_for_index(index)
         try:
-            search_service = self.boto_conn.get_domain(self.get_searchdomain_name(index)).get_search_service(loose=False, needs_integrity=True)
+            search_service = self.get_domain(index).get_search_service(loose=False, needs_integrity=True)
         except (CloudsearchProcessingException, CloudsearchNeedsIndexingException):
             raise  # We should probably wrap this into something more common to haystack
         query = search_service.search(bq=query_string, return_fields=return_fields, **kwargs)
