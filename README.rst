@@ -114,13 +114,10 @@ The way to bootstrap the system by hand is like this (in the shell)::
   >>> b.setup()
   >>> b.enable_index_access(i, b.ip_address)
   >>> b.boto_conn.layer1.index_documents(b.get_searchdomain_name(i))
-  >>> def get_domain():
-  ...     return b.boto_conn.get_domain(b.get_searchdomain_name(i))
-  ...
   >>> import time
   >>> t0 = int(time.time())
   >>> while True:
-  ...     if not get_domain().processing:
+  ...     if not b.get_domain(i).processing:
   ...         print int(time.time()) - t0
   ...         break
   ...     time.sleep(30)
