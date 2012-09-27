@@ -85,23 +85,27 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             return cache[index]
         except KeyError:
             model = index.get_model()
-            cache[index] = "%s-%s-%s" % tuple(map(lambda x: x.lower(), (self.search_domain_prefix, model._meta.app_label, unicode(index.__class__.__name__).strip('_'))))
+            name = getattr(getattr(index, 'Meta', object()), 'index_name', None)
+            if name is not None:
+                cache[index] = name
+            else:
+                cache[index] = "%s-%s-%s" % tuple(map(lambda x: x.lower(), (self.search_domain_prefix, model._meta.app_label, unicode(index.__class__.__name__).strip('_'))))
             return cache[index]
 
     def get_field_type(self, field):
         """ maps field type classes to cloudsearch field types; raises KeyError if field is unmappable """
         d = {
-                'CharField': u'text',
-                'FacetCharField': u'text',
-                'UnsignedIntegerField': u'uint',
-                'LiteralField': u'literal',
-                'FacetLiteralField': u'literal',
-                'MultiValueCharField': u'text',
-                'FacetMultiValueCharField': u'text',
-                'MultiValueLiteralField': u'literal',
-                'FacetMultiValueLiteralField': u'literal',
-                'MultiValueUnsignedIntegerField': u'uint',
-            }
+            'CharField': u'text',
+            'FacetCharField': u'text',
+            'UnsignedIntegerField': u'uint',
+            'LiteralField': u'literal',
+            'FacetLiteralField': u'literal',
+            'MultiValueCharField': u'text',
+            'FacetMultiValueCharField': u'text',
+            'MultiValueLiteralField': u'literal',
+            'FacetMultiValueLiteralField': u'literal',
+            'MultiValueUnsignedIntegerField': u'uint',
+        }
         return d[field.__class__.__name__]
 
     def validate_search_domain_name(self, search_domain_name):
@@ -242,7 +246,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         haystack_conn = haystack.connections[self.connection_alias]
         unified_index = haystack_conn.get_unified_index()
         return dict((index.get_model().__class__.__name__, index)
-                for index in unified_index.collect_indexes())
+                    for index in unified_index.collect_indexes())
 
     def update(self, index, iterable, errors_allowed=False):
         iterable = list(iterable)
@@ -254,7 +258,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 self.log.error(u'Failed to add documents to Cloudsearch')
                 name = getattr(e, '__name__', e.__class__.__name__)
                 self.log.error(u'%s while setting up index' % name, exc_info=True,
-                        extra={'data': {'index': index}})
+                               extra={'data': {'index': index}})
                 if not self.prepare_silently:
                     raise
                 return
@@ -389,11 +393,9 @@ class CloudsearchSearchBackend(BaseSearchBackend):
 
         # by convention, empty query strings return no results
         if len(query_string) == 0:
-            return {
-                    'results': [],
+            return {'results': [],
                     'hits': 0,
-                    'facets': {},
-            }
+                    'facets': {}}
 
         if not self.setup_complete:
             self.setup()
@@ -461,11 +463,9 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             result_class = SearchResult
 
         if hasattr(boto_results, 'facets'):
-            facets = {
-                    'fields': {},
-                    'dates': {},
-                    'queries': {},
-            }
+            facets = {'fields': {},
+                      'dates': {},
+                      'queries': {}}
 
             for facet_fieldname, individuals in boto_results.facets.items():
                 facets['fields'][facet_fieldname] = [(x[u'value'], x[u'count']) for x in individuals[u'constraints']]
@@ -502,11 +502,9 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                 result = result_class(app_label, model_name, result[DJANGO_ID][0], score, **additional_fields)
                 results.append(result)
 
-        return {
-                'results': results,
+        return {'results': results,
                 'hits': hits,
-                'facets': facets,
-        }
+                'facets': facets}
 
 
 class CloudsearchSearchQuery(BaseSearchQuery):
