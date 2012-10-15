@@ -87,7 +87,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
             model = index.get_model()
             name = getattr(getattr(index, 'Meta', object()), 'index_name', None)
             if name is not None:
-                cache[index] = name
+                cache[index] = '%s-%s' % (self.search_domain_prefix, name)
             else:
                 cache[index] = "%s-%s-%s" % tuple(map(lambda x: x.lower(), (self.search_domain_prefix, model._meta.app_label, unicode(index.__class__.__name__).strip('_'))))
             return cache[index]
@@ -166,9 +166,8 @@ class CloudsearchSearchBackend(BaseSearchBackend):
                         args['result'] = field[u'literal_options'][u'result_enabled']
                         args['searchable'] = field[u'literal_options']['search_enabled']
 
-                    if default:
+                    if default is not None:
                         args['default'] = default
-
                     self.boto_conn.layer1.define_index_field(**args)
 
         self.setup_complete = True  # should be True when finished
@@ -184,6 +183,15 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         for name, field in fields.iteritems():
             d = {}
             default_value = (u'%s' % (field._default,)) if field.has_default() else {}
+            default_value = {}
+            if field.has_default():
+                tmp = field._default
+                if type(tmp) is list:
+                    if len(tmp) != 1:
+                        self.log.critical("Field '%s' of type '%s' is a multivalue field with more than one default. Values outside the first will be truncated!" % (
+                            name, type(field)))
+                    tmp = tmp[0]
+                default_value = u'%s' % (tmp,)
             try:
                 field_type = self.get_field_type(field)
             except KeyError:
