@@ -68,6 +68,7 @@ Installation
             #'MAX_SPINLOCK_TIME': 60*60,  # number of seconds before processing spinlocks give up
             #'PREPARE_SILENTLY': False, # If False, raise ValidationError if preparation of uploads fails.
                                         # If True, continue with upload
+            #'REGION': 'us-east-1', # The region you want to create the search domain in. Defaults to 'us-east-1'
         }
     }
 
