@@ -45,11 +45,17 @@ class CloudsearchSearchBackend(BaseSearchBackend):
 
         # We want to check if there is a 'REGION' passed into the connection. If there is we validate it with the
         # available regions.
-        region = connection_options.get('REGION', None)
+        region_name = connection_options.get('REGION', None)
         region_list = [cloudsearch_region.name for cloudsearch_region in boto.cloudsearch.regions()]
+        region_conn = None
 
-        if region and region not in region_list:
+        if region_name and region_name not in region_list:
             raise ImproperlyConfigured("The 'REGION' in your connection settings is not valid. Available regions are %s" % region_list)
+        elif region_name:
+            for region in boto.cloudsearch.regions():
+                if region.name == region_name:
+                    region_conn = region
+                    break
 
         # Allow overrides for the SearchDomain prefix
         self.search_domain_prefix = connection_options.get('SEARCH_DOMAIN_PREFIX', 'haystack')
@@ -66,7 +72,7 @@ class CloudsearchSearchBackend(BaseSearchBackend):
         self.boto_conn = boto.connect_cloudsearch(
             aws_access_key_id=connection_options['AWS_ACCESS_KEY_ID'],
             aws_secret_access_key=connection_options['AWS_SECRET_KEY'],
-            region=region
+            region=region_conn
         )
 
         # this will become a standard haystack logger down the line
